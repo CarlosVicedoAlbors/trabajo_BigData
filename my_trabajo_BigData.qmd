@@ -1,0 +1,359 @@
+---
+title: "Análisis Económico-Demográfico de la Unión Europea"
+description: |
+  Los países en Europa y Europa en el mundo
+author:
+  - name: Carlos Vicedo Albors
+    affiliation: Universitat de València
+    affiliation-url: https://www.uv.es
+date: 2024-01-25                           #--
+categories: [trabajo BigData, Unión Europea, Economía,]   #--
+image: "./imagenes/imagen_01.png"
+title-block-banner: true #- {true, false, "green","#AA0000"}
+title-block-banner-color: "yellow"    #-"#FFFFFF" 
+toc-depth: 3
+smooth-scroll: true
+format: 
+  html:
+    #backgroundcolor: "#F1F3F4"
+    #embed-resources: true
+    link-external-newwindow: true
+    #css: ./assets/my_css_file.css   #- CUIDADO!!!!
+code-tools: true
+code-link: true
+---
+
+
+## Intro 
+
+El siguiente trabajo pretenderá, en la medida de sus posibilidades, proporcionar al lector una visión clara y concisa de la situación macroeconómica y demográfica de la Unión Europea. Este análisis, como no podría ser de otra modo, se centrará en los países miembros de la Unión y en su evolución, tanto económica como poblacional. Veremos que la Unión, lejos de estar formada por países homogéneos, es un auténtico mosáico de realidades sociales y económicas. Su estudio nos permitirá comprender mejor la realidad Europea.
+
+## Metodología y fuentes
+Las fuentes de información que se han utilizado provienen únicamente de tres fuentes de información: Eurostat, el Banco Mundial y la base de datos de la FRED. La metodología en ambos casos ha sido la misma: coger los datos en crudo y proceder a su procesado (tidy) y a su representación gráfica utilizando los métodos y técnicas vistos a lo largo del curso.
+
+Los paquetes utilizados a lo largo del trabajo han sido los siguientes:
+
+## Paquetes
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(ggthemes)
+library(gganimate)
+library(plotly)
+library(wordcloud)
+library(wordcloud2)
+library(WDI)
+library(DT)
+
+
+#PIB_percapita_España <- WDI(indicator = "NY.GDP.PCAP.CD", country = "ES", start = 1960, end = 2022)
+#PIB_percapita_Francia <- WDI(indicator = "NY.GDP.PCAP.CD", country = "FR", start = 1960, end = 2022)
+#PIB_percapita_Italia<- WDI(indicator = "NY.GDP.PCAP.CD", country = "IT", start = 1960, end = 2022)
+#PIB_percapita_Reino_Unido <- WDI(indicator = "NY.GDP.PCAP.CD", country = "GB", start = 1960, end = 2022)
+
+
+
+
+
+```
+
+
+---
+
+## Comparación Producto Interior Bruto de las principales economías del euro
+Los siguientes datos han sido extraídos de la base de datos de la FRED. En ellos se puede observar(una vez han sido procesados) el PIB en términos absolutos de las principales economías del Euro. En este caso se ha optado por tomar como dato base el PIB de cada uno de los países en el primer año de estudio. Partiendo de este dato y, siendo 100=PIB del 1995, se ha podido estudiar el nivel de riqueza nacional de cada país para el año 2022 en comparación con su mismo nivel del año 1995. 
+Podemos observar como España es el país que ha incrementado en mayor medida su Producto interior bruto, siendo 66 puntos mayor que su valor en 1995. Resulta, a su vez, llamativo como un país tan similar a España en términos económicos, sociales y políticos, como es Italia, haya obtenido unos resultados en materia de crecimiento tan pobres. Estoy seguro de que el lector de este trabajo recuerda la enorme potencia del Made in Italy de los años 90, asociado a una gran industria de productos de bajo valor añadido que, a su vez, estaba apoyada en la utilización de recursos genéricos y en las depreciaciones competitivas de la lira italiana para mantener baratas las exportaciones. Cuando se impuso a moneda única, Italia tuvo que despedirse de un modelo económico para el cual todavía no ha encontrado un sustituto firme. 
+
+
+```{r}
+aa<-rio::import(here::here("datos","datos_pib.csv"))
+
+df<-aa %>%rename(Alemania=CLVMNACSCAB1GQDE,España=CLVMNACSCAB1GQES,Francia=CLVMNACSCAB1GQFR,Italia=CLVMNACSCAB1GQIT,fecha=DATE)%>%filter(between(as.Date(fecha), as.Date("1995-01-01"), as.Date("2022-01-01")))%>%mutate(across(c(Alemania, España, Francia, Italia), as.numeric))
+
+
+df_longer<-df%>%tidyr::pivot_longer(cols=2:5, names_to= "paises",values_to="valores")
+
+base_values <- df_longer %>% filter(fecha == "1995-01-01") %>% select(paises, base_pib = valores)
+
+df_longer2 <- df_longer %>%left_join(base_values, by = "paises") %>%mutate(PIB_Indice = valores/ base_pib * 100) %>% select(-base_pib)
+
+graf1<-ggplot(df_longer2,aes(fecha,PIB_Indice, color=paises))+ geom_line(size=1.5)+labs(title="PIB grandes economías del euro")+ labs(subtitle="Base PIB 1995")+ labs(caption="elaboración propia a partir de datos de la FRED")+labs(x=NULL)+ labs(y=NULL)+theme_stata()+labs(x="fecha")+labs(y="valor")+labs(subtitle = "PIB 1995=100")
+
+graf1<-ggplotly(graf1)
+
+graf1
+
+```
+
+
+---
+
+
+## Variación PIB per capita de las principales economías del Euro
+Los siguientes datos han sido extraídos del Banco Mundial, accediendo a ellos directamente desde R. Han sido seleccionados, una vez más, las principales economías del Euro y, adicionalmente, Reino Unido. Ambos gráficos representan la evolución del PIB per capita de los distintos países seleccionados. En el primer caso (graf2) se ha optado por obsevar esta evolución en términos absolutos, en cambio, en el graf3 se ha observado la evolución en términos relativos, es decir, en porcentaje de crecimiento y decrecimiento. En el caso del gráfico 3 se ha señalado en rojo , y delimitado por una línea del mismo color, los años de observación en los cuales se produjo una pérdida neta de renta. En ambos casos se ha acotado la observación del 1970 hasta el 2022 porque, en el caso de Alemania, no disponíamos de los datos para analizar todo el periodo que nos permite el Banco Mundial (desdel 1960 hasta el 2022).
+
+
+```{r}
+esp_renta<-rio::import(here::here ("datos","renta_esp.csv"))
+fr_renta<-rio::import(here::here ("datos","renta_fr.csv"))
+it_renta<-rio::import(here::here ("datos","renta_it.csv"))
+uk_renta<-rio::import(here::here ("datos","renta_uk.csv"))
+al_renta<-rio::import(here::here ("datos","renta_al.csv"))
+
+
+PIB_percapita_agrupado<- bind_rows(al_renta, esp_renta,fr_renta,it_renta,uk_renta)%>% select(country,year,renta=NY.GDP.PCAP.CD)
+
+
+
+crecimiento<- PIB_percapita_agrupado%>% filter(year%in%c(1970,2022))%>%  
+         group_by(country, year) %>% 
+         summarize(media = mean(renta)) %>% ungroup() %>% group_by(country) %>% 
+          arrange(year) %>% mutate(crecimiento_absoluto = media - lag(media)) %>% filter(year==2022)%>% mutate(crecimiento_relativo=(crecimiento_absoluto/media)*100) %>% arrange(desc(crecimiento_absoluto)) %>% mutate(crecimiento_relativo = scales::percent(crecimiento_relativo, scale = 1, accuracy = 0.01))
+
+
+crecimiento_año<-PIB_percapita_agrupado%>% group_by(country) %>% 
+  select(country, year, renta ) %>% filter(year %in% c(1970:2022))%>%
+  mutate(incremento_anual=lag(renta) -renta )%>% mutate(porcentaje=(incremento_anual/renta)*100)
+  
+
+graf2<-ggplot(crecimiento_año, aes(year, incremento_anual, color=country))+geom_line()+labs(title="crecimiento PIB per capita")+labs(subtitle = "principales economías del Euro y Reino Unido")+ labs(caption = "Elaboración propia a partir de datos del Banco Mundial")+ labs(x="fecha")+labs(y="incremento anual")+theme_stata()
+
+graf2<-ggplotly(graf2)
+
+graf3<-ggplot(crecimiento_año, aes(year, porcentaje, color=country))+geom_line()+labs(title="crecimiento PIB per capita")+labs(subtitle = "principales economías del Euro")+ labs(caption = "Elaboración propia a partir de datos del Banco Mundial")+ labs(x="fecha")+labs(y="crecimiento(en %)")+ theme_stata()+ geom_hline(yintercept = 0, size = 1.2, colour = "red", linetype = "dashed")+ annotate("rect", xmin = -Inf, xmax = Inf,ymin = -Inf, ymax = 0, alpha = 0.2, fill = "pink")+annotate(geom = "text",x= 2000,y = -15,label = "Perdida neta de renta",size = 3)+labs(color = "Países")
+
+                
+
+                  
+graf2
+  
+  
+graf3
+
+
+
+
+
+
+
+
+```
+
+
+
+---
+
+
+## Evolución del PIB per capita
+Para el siguiente gráfico nos hemos servido de los valores de renta per cápita extraidos en el ejercicio anterior. En este gráfico podemos observar la evolución del PIB per capita de los principales países europeos y cómo sus niveles de renta han ido variando con el paso del tiempo. Los shocks más importantes que ocurrieron durante el periodo de observación se han señalado mediante una franja roja y su correspondiente nombre. Resulta muy interesante ver como la enorme interdependencia de los países europeos les hace tener unas variaciones parecidas de la renta per capita ante los shocks económicos. 
+
+
+```{r}
+graf4<-ggplot(PIB_percapita_agrupado, aes(year, renta, color=country))+geom_line()+labs(title = "Comparativa de Renta per cápita (1960-2020)")+labs(subtitle="Principales economías del Euro y Reino Unido")+ labs(caption = "Elaboración propia a partir de datos del WDI")+ labs(x="fecha")+theme_stata()+annotate("rect",xmin=2008,xmax = 2013,ymin=-Inf,ymax = Inf,alpha=0.2,fill="pink")+annotate(geom = "text",x= 2011,y = 24000,label = "Estallido burbuja inmobiliaria",size = 2.3)+annotate("rect",xmin=1992,xmax = 1994,ymin=-Inf,ymax = Inf,alpha=0.2,fill="pink")+ annotate(geom = "text",x= 1992,y = 5000,label = "Recesión guerra del golfo",size = 2.3)+ annotate("rect",xmin=1980,xmax = 1985,ymin=-Inf,ymax = Inf,alpha=0.2,fill="pink")+ annotate(geom = "text",x= 1980,y = 18000,label = "Segunda crisis del petroleo",size = 2.3)
+
+graf4
+
+```
+
+
+---
+
+## Mapa del PIB per cápita
+A continuación se puede observar un mapa que representa los distintos niveles de renta en el escenario europeo. Los datos han sido extraídos de Eurostat. Se ha optado por cambiar la escala de colores con el fin de representar un poco mejor las disparidades entre los distintos países. Es interesante ver como la dicotomía norte-sur se mantiene con el paso del tiempo. Por otra parte y, pese a que ya hace treinta años que desapareció el Telón de Acero, todavía se puede diferenciar a simple vista los países que pertenecieron al Primer Mundo (países capitalistas) y al Segundo Mundo (países comunistas-socialistas) por su nivel de renta.
+
+
+```{r}
+renta_todos<-rio::import(here::here("datos","pib_percapita_all.csv"))
+
+renta_todos_arreglado<-renta_todos%>%select(region="Geopolitical entity (reporting)", fecha="TIME_PERIOD",valor="OBS_VALUE")%>% filter(fecha==2022)%>%select(region,valor)%>%filter(region!="Euro area - 19 countries  (2015-2022)")%>%filter(region!="Euro area – 20 countries (from 2023)")%>%filter(region!="European Union - 27 countries (from 2020)")
+
+
+
+mapdata<-map_data("world")
+
+mapdata <- left_join(mapdata, renta_todos_arreglado, by="region")
+
+
+mapdata1<-mapdata %>% filter(!is.na(mapdata$valor))
+
+
+map1<-ggplot(mapdata1, aes( x = long, y = lat, group=group)) +
+  geom_polygon(aes(fill = valor), color = "black")
+
+map2 <- map1 + scale_fill_gradient(name = "pib per capita", low = "red", high =  "green", na.value = "grey50")+
+  theme(axis.text.x = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks = element_blank(),
+        axis.title.y=element_blank(),
+        axis.title.x=element_blank(),
+        rect = element_blank())
+
+
+map2<-ggplotly(map2)
+
+map2
+
+```
+
+---
+
+## Crecimiento demográfico por países
+Los datos para el siguiente gráfico han sido extraídos, nuevamente, de Eurostat.En el gráfico se representan los distintos países de la Unión junto con su tasa de crecimiento acumulada. El número de variables en el eje x impedía que se viesen correctamente, por ello he utilizado las etiquetas de los países para solucionar el problema. Además, he añadido un cuadro para que se pueda consultar el significado de cada sigla (esto ha sido, más que nada una excusa para poner un cuadro en el trabajo, porque se hubiese podido solucionar el problema de espacio haciendo que las barras estuviesen en horizontal). La línea que cruza el gráfico es el crecimiento medio de los países. El dato no está ponderado por población, por lo tanto y, dado el mayor crecimiento de los pequeños estados europeos, es posible que fuese menor para el caso de los grandes países. La finalidad de este pequeño añadido es que observemos como España (representado por las letras EE) ha experimentado unas tasas de crecimento poblacional acumulado notablemente mayores a la media europea. Esta observación ha de ser analizada de forma conjunta con las conclusiones ya vistas para el caso de España: el PIB ha crecido notablemente, no así el PIB per capita. Esto nos lleva a suponer que el incremento del PIB español se ha debido, en mayor grado, a los incrementos en factor trabajo, en lugar de en productividad. 
+
+```{r}
+poblacion_europea<-rio::import(here::here("datos","este.csv"))
+
+Poblacion_europea_2022<-poblacion_europea%>%select(pais="geo: Geopolitical entity (reporting)", anio= "TIME_PERIOD: Time", valor="OBS_VALUE: Observation value") %>% filter(anio==2022)%>% filter(pais!="EU27_2020: European Union - 27 countries (from 2020)") %>%drop_na()%>%mutate(Poblacion_total=sum(valor))%>%mutate(porcentaje=(valor/Poblacion_total)*100)
+
+Poblacion_europea_2022<-Poblacion_europea_2022%>% separate(col = pais,into = c("etiqueta", "pais"), sep  = ":")
+
+  
+poblacion_europea_evolucion<-poblacion_europea %>% select(pais="geo: Geopolitical entity (reporting)", anio= "TIME_PERIOD: Time", valor="OBS_VALUE: Observation value") %>% filter(pais!="EU27_2020: European Union - 27 countries (from 2020)")%>%filter(pais!="FR: France") %>%separate(col = pais,into = c("etiqueta", "pais"), sep  = ":") %>%filter (anio %in%c(1960,2022)) %>%group_by(pais) %>%mutate(crecimiento=((max(valor)-min(valor))/min(valor))*100)%>%filter(anio==2022)%>%arrange(desc(crecimiento))
+
+media_crecimiento<-poblacion_europea_evolucion%>%ungroup()%>%summarise(media=mean(crecimiento))
+
+DT::datatable(poblacion_europea_evolucion%>%select(etiqueta,pais))
+
+graf7 <- ggplot(poblacion_europea_evolucion, aes(x = reorder(etiqueta, -crecimiento), y = crecimiento)) + geom_bar(fill = "#0ABAB5", stat = "identity") +theme_stata() + labs(title = "Crecimiento poblacional por países UE") + labs(subtitle = "periodo 1960-2022") + labs(caption = "elaboración propia a partir de datos de Eurostat")+ labs(x="país")+labs(y="crecimiento(%)")+ geom_hline(yintercept =32.047 , size = 1, colour = "firebrick", linetype = "dashed")
+
+
+graf7
+
+
+
+
+
+```
+
+---
+
+
+## Peso demográfico por países
+
+En el siguiente gráfico podemos observar la distribución de la población de la Unión Europea como porcentaje del total. Para ello, nos hemos servido del data.frame utilizado en el apartado anterior. El gráfico nos permite observar la distribución de la población europea por países, siendo Alemania el principal contenedor poblacional, con cerca de un 19% del total. Si miramos los países con un menor peso, podremos observar como el gran porcentaje de países miembros tienen, en la práctica, un peso demográfico irrisorio. Los cuatro países más grandes de la UE aportan, por sí sólos, casi el 60% de la población. No resultará difícil averiguar quienes, en la práctica, son los que toman las decisiones en el seno de la Unión. He querido añadir un wordcloud que, aunque no aporta un gran valor analítico, me ha parecido muy atractico estéticamente.
+
+
+```{r}
+ graf5 <- plot_ly( 
+  Poblacion_europea_2022,
+  labels = ~pais,
+  parents = ~"",
+  values = ~porcentaje,
+  ids = ~pais,
+  type = "sunburst",
+  marker = list(colors = 'Viridis'),
+  textinfo = "label+percent entry",
+  insidetextorientation = "radial"
+) %>%
+  layout(
+    title = "Proporción de Población Europea por País",
+    font = list(size = 14),
+    margin = list(l = 0, r = 0, b = 0, t = 40),
+    colorway = c("#3498db", "#e43725", "#3acc2e", "#8f4bab", "#f39c12", "#1abc9c"),
+    paper_bgcolor = "white",
+    plot_bgcolor = "black",
+    hoverlabel = list(
+      bgcolor = "white",
+      font = list(size = 14)
+    )
+  )
+
+
+graf5
+
+
+
+graf9 <- Poblacion_europea_2022 %>% arrange(desc(valor)) %>% with(wordcloud(words = pais, freq = valor, scale=c(3,0.5), colors=brewer.pal(8, "Dark2")))
+
+
+
+```
+
+
+---
+
+
+## Pirámide demográfica europea
+
+En este último gráfico podemos observar la pirámide demográfica de los países europeos. Los datos no se circunscriben únicamente a los países miembros de la Unión Europea, sino a los países que se encuentran en el continente europeo. No obstante, podemos extrapolar los resultados porque, al fin y al cabo, las condiciones culturales y ambientales son similares entre, por ejemplo, Suecia (país miembro) y Noruega (país no miembro).
+Podemos observar una tendencia al envejecimiento de la población, claramente visible a través de de unas cohortes generacionales cada vez más reducidas. La baja natalidad es un problema que afecta a todos los países europeos, aunque en algunos casos más que en otros. Resulta especialmente alarmante las bajas tasas de natalidad de los países mediterráneos, en los cuales el determinante cultural se une al determinante económico: la gente quiere tener pocos hijos y aunque quisieran tener más, no se lo podrían permitir. 
+
+
+
+```{r}
+
+data<-rio::import(here::here ("datos" , "piramide.csv"))
+
+data <- data%>%
+  pivot_longer(names_to = 'Gender', values_to = 'Population', cols = 2:3) %>%
+  mutate(PopPerc=case_when(Gender=='M'~round(Population/sum(Population)*100,2),
+                           TRUE~-round(Population/sum(Population)*100,2)),
+         signal=case_when(Gender=='M'~1,
+                          TRUE~-1))
+head(data)
+levels(data$Age)
+data$Age <- factor(data$Age,levels=unique(data$Age),ordered=TRUE)
+
+graf8<-ggplot(data)+
+  geom_bar(aes(x=Age,y=PopPerc,fill=Gender),stat='identity')+
+  geom_text(aes(x=Age,y=PopPerc+signal*.3,label=abs(PopPerc)))+
+  coord_flip()+
+  scale_fill_manual(name='',values=c('darkred','steelblue'))+
+  scale_y_continuous(breaks=seq(-10,10,1),
+                     labels=function(x){paste(abs(x),'%')})+
+  labs(x='',y='Población(%)',
+       title='Pirámide poblacional Europa',
+       subtitle=paste('Residentes totales en el continente europeo:', format(sum(data$Population),big.mark='.')),
+       caption='Source: PopulationPyramid.net')+
+  cowplot::theme_cowplot()+
+  theme(axis.text.x=element_text(vjust=.5),
+        panel.grid.major.y = element_line(color='lightgray',linetype='dashed'),
+        legend.position = 'top',
+        legend.justification = 'center')
+
+
+
+graf8<-ggplotly(graf8)
+
+graf8
+
+
+
+
+```
+
+---
+
+## Conclusión
+
+La Unión Europea es, sin lugar a dudas, uno de los espacios económicos, culturales y demográficos más importantes del planeta. Por su volumen poblacional y su potencial productivo y económico, se hace necesario estudiarlo desagregándolo por sus estados miembros. En el presente trabajo hemos podido observar y analizar diversos aspectos relevantes que nos permiten entender un poco mejor la estructura demográfica y poblacional de la Unión
+
+
+
+
+
+
+
+<br>
+
+Este ja sido mi trabajo. Espero que te haya gustado. 
+
+<br>
+
+----------------------
+
+<br>
+
+### Información sobre la sesión
+
+Abajo muestro mi entorno de trabajo y paquetes utilizados
+
+```{r}
+#| echo: false
+sessioninfo::session_info() %>% 
+  details::details(summary = 'current session info') 
+```
+
+
+
